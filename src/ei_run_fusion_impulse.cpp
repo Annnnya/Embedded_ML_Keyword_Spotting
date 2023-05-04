@@ -23,6 +23,7 @@
 #include "firmware-sdk/ei_fusion.h"
 #include "ei_device_psoc62.h"
 #include "ei_run_impulse.h"
+//#include "eink.h"
 
 
 typedef enum {
@@ -73,8 +74,19 @@ static void display_results(ei_impulse_result_t* result)
 {
     ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
         result->timing.dsp, result->timing.classification, result->timing.anomaly);
+    size_t max_index = 0;
+    float max_value = 0;
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
         ei_printf("    %s: \t%f\r\n", result->classification[ix].label, result->classification[ix].value);
+        if (result->classification[ix].value > max_value){
+        	max_value = classification[ix].value;
+        	max_index = ix;
+        }
+    }
+    if (max_value<0.5){
+    	ei_printf("Result: couldn't classify");
+    } else {
+    	ei_printf("Result %s: %d", result->classification[max_index].label, max_value);
     }
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
     ei_printf("    anomaly score: %f\r\n", result->anomaly);

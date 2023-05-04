@@ -58,7 +58,6 @@
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
 #include "edge-impulse-sdk/porting/ei_logging.h"
 
-#include "model-parameters/dsp_blocks.h"
 #include <model-parameters/model_metadata.h>
 
 /*****************************************
@@ -569,6 +568,25 @@ EI_IMPULSE_ERROR drpai_run_yolov5_postprocessing(
 #endif
 
 /**
+ * @brief      Do neural network inferencing over the processed feature matrix
+ *
+ * @param      fmatrix  Processed matrix
+ * @param      result   Output classifier results
+ * @param[in]  debug    Debug output enable
+ *
+ * @return     The ei impulse error.
+ */
+EI_IMPULSE_ERROR run_nn_inference(
+    const ei_impulse_t *impulse,
+    ei::matrix_t *fmatrix,
+    ei_impulse_result_t *result,
+    void *config_ptr,
+    bool debug = false)
+{
+    // dummy, not used for DRPAI
+}
+
+/**
  * Special function to run the classifier on images, only works on TFLite models (either interpreter or EON or for tensaiflow)
  * that allocates a lot less memory by quantizing in place. This only works if 'can_run_classifier_image_quantized'
  * returns EI_IMPULSE_OK.
@@ -577,8 +595,10 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
     const ei_impulse_t *impulse,
     signal_t *signal,
     ei_impulse_result_t *result,
+    void *config_ptr,
     bool debug = false)
 {
+    // this needs to be changed for multi-model, multi-impulse
     static bool first_run = true;
     uint64_t ctx_start_us;
     uint64_t dsp_start_us = ei_read_timer_us();
@@ -608,14 +628,14 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
 
     EI_LOGD("fmatrix size == Bpp * signal.total_length ( %p == %p * %p = %p )\r\n", proc[DRPAI_INDEX_INPUT].size, 3, signal->total_length, 3 * signal->total_length);
     // Creates a features matrix mapped to the DRP-AI UDMA input region
-    ei::matrix_i8_t features_matrix(1, proc[DRPAI_INDEX_INPUT].size, (int8_t *)drpai_input_buf);
+    ei::matrix_u8_t features_matrix(1, proc[DRPAI_INDEX_INPUT].size, drpai_input_buf);
 
     // Grabs the raw image buffer from the signal, DRP-AI will automatically
     // extract features
     ret = extract_drpai_features_quantized(
         signal,
         &features_matrix,
-        ei_dsp_blocks[0].config,
+        impulse->dsp_blocks[0].config,
         impulse->frequency);
     if (ret != EIDSP_OK) {
         ei_printf("ERR: Failed to run DSP process (%d)\n", ret);
@@ -671,8 +691,8 @@ EI_IMPULSE_ERROR run_nn_inference_image_quantized(
                     impulse,
                     result,
                     drpai_output_buf,
-                    impulse->input_width / 8,
-                    impulse->input_height / 8);
+                    impulse->fomo_output_size,
+                    impulse->fomo_output_size);
                 break;
             }
             case EI_CLASSIFIER_LAST_LAYER_SSD: {

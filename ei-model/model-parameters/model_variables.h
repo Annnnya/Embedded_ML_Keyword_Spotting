@@ -24,26 +24,69 @@
 
 #include <stdint.h>
 #include "model_metadata.h"
+
+#include "tflite-model/trained_model_compiled.h"
 #include "edge-impulse-sdk/classifier/ei_model_types.h"
+#include "edge-impulse-sdk/classifier/inferencing_engines/engines.h"
 
-const char* ei_classifier_inferencing_categories[] = { "noise", "off", "on", "unknown" };
+const char* ei_classifier_inferencing_categories[] = { "blue", "green", "noise", "purple", "red", "silence", "unknown", "white", "yellow" };
 
-uint8_t ei_dsp_config_3_axes[] = { 0 };
-const uint32_t ei_dsp_config_3_axes_size = 1;
-ei_dsp_config_mfe_t ei_dsp_config_3 = {
-    3, // int implementationVersion
+uint8_t ei_dsp_config_9_axes[] = { 0 };
+const uint32_t ei_dsp_config_9_axes_size = 1;
+ei_dsp_config_mfcc_t ei_dsp_config_9 = {
+    9, // uint32_t blockId
+    4, // int implementationVersion
     1, // int length of axes
+    13, // int num_cepstral
     0.02f, // float frame_length
-    0.01f, // float frame_stride
-    40, // int num_filters
+    0.02f, // float frame_stride
+    32, // int num_filters
     256, // int fft_length
-    300, // int low_frequency
-    0, // int high_frequency
     101, // int win_size
-    -52 // int noise_floor_db
+    0, // int low_frequency
+    0, // int high_frequency
+    0.98f, // float pre_cof
+    1 // int pre_shift
 };
 
-#define EI_DSP_PARAMS_GENERATED 1
+const size_t ei_dsp_blocks_size = 1;
+ei_model_dsp_t ei_dsp_blocks[ei_dsp_blocks_size] = {
+    { // DSP block 9
+        1040,
+        &extract_mfcc_features,
+        (void*)&ei_dsp_config_9,
+        ei_dsp_config_9_axes,
+        ei_dsp_config_9_axes_size
+    }
+};
+
+const ei_config_tflite_eon_graph_t ei_config_tflite_graph_0 = {
+    .implementation_version = 1,
+    .model_init = &trained_model_init,
+    .model_invoke = &trained_model_invoke,
+    .model_reset = &trained_model_reset,
+    .model_input = &trained_model_input,
+    .model_output = &trained_model_output,
+};
+
+const ei_learning_block_config_tflite_graph_t ei_learning_block_config_0 = {
+    .implementation_version = 1,
+    .block_id = 0,
+    .object_detection = 0,
+    .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_UNKNOWN,
+    .output_data_tensor = 0,
+    .output_labels_tensor = 1,
+    .output_score_tensor = 2,
+    .graph_config = (void*)&ei_config_tflite_graph_0
+};
+
+const size_t ei_learning_blocks_size = 1;
+const ei_learning_block_t ei_learning_blocks[ei_learning_blocks_size] = {
+    {
+        &run_nn_inference,
+        (void*)&ei_learning_block_config_0,
+    },
+};
 
 const ei_model_performance_calibration_t ei_calibration = {
     1, /* integer version number */
@@ -53,5 +96,53 @@ const ei_model_performance_calibration_t ei_calibration = {
     (int32_t)(EI_CLASSIFIER_RAW_SAMPLE_COUNT / ((EI_CLASSIFIER_FREQUENCY > 0) ? EI_CLASSIFIER_FREQUENCY : 1)) * 500, /* Half of model window */
     0   /* Don't use flags */
 };
+
+
+const ei_impulse_t impulse_204571_4 = {
+    .project_id = 204571,
+    .project_owner = "Anna",
+    .project_name = "Annnnya-project-1",
+    .deploy_version = 4,
+
+    .nn_input_frame_size = 1040,
+    .raw_sample_count = 25600,
+    .raw_samples_per_frame = 1,
+    .dsp_input_frame_size = 25600 * 1,
+    .input_width = 0,
+    .input_height = 0,
+    .input_frames = 0,
+    .interval_ms = 0.0625,
+    .frequency = 16000,
+    .dsp_blocks_size = ei_dsp_blocks_size,
+    .dsp_blocks = ei_dsp_blocks,
+    
+    .object_detection = 0,
+    .object_detection_count = 0,
+    .object_detection_threshold = 0,
+    .object_detection_last_layer = EI_CLASSIFIER_LAST_LAYER_UNKNOWN,
+    .fomo_output_size = 0,
+    
+    .tflite_output_features_count = 9,
+    .learning_blocks_size = ei_learning_blocks_size,
+    .learning_blocks = ei_learning_blocks,
+
+    .inferencing_engine = EI_CLASSIFIER_TFLITE,
+    
+    .quantized = 1,
+    
+    .compiled = 1,
+
+    .sensor = EI_CLASSIFIER_SENSOR_MICROPHONE,
+    .fusion_string = "audio",
+    .slice_size = (25600/4),
+    .slices_per_model_window = 4,
+
+    .has_anomaly = 0,
+    .label_count = 9,
+    .calibration = ei_calibration,
+    .categories = ei_classifier_inferencing_categories
+};
+
+const ei_impulse_t ei_default_impulse = impulse_204571_4;
 
 #endif // _EI_CLASSIFIER_MODEL_METADATA_H_

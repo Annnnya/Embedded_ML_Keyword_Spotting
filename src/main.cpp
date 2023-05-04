@@ -19,6 +19,10 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include "cyhal.h"
+#include "cybsp.h"
+#include "cy_retarget_io.h"
+
 #include "edge-impulse-sdk/porting/ei_classifier_porting.h"
 #include "firmware-sdk/ei_device_info_lib.h"
 #include "ei_device_psoc62.h"
@@ -31,6 +35,7 @@
 #include "cyhal_clock.h"
 #include "cyhal_gpio.h"
 #include "cyhal_uart.h"
+//#include "eink.h"
 
 /******
  *
@@ -62,17 +67,23 @@ void cy_err(int result)
 
 void board_init(void)
 {
-    cy_rslt_t result;
+	cy_rslt_t result;
     cyhal_clock_t system_clock, pll_clock;
+
+    /* Initialize the device and board peripherals */
+	result = cybsp_init();
+
+	/* Board init failed. Stop program execution */
+	if (result != CY_RSLT_SUCCESS)
+	{
+		CY_ASSERT(0);
+	}
 
     /* Make sure firmware starts after debugger */
     if (CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk) {
         Cy_SysLib_Delay(400u);
     }
 
-    /* Initialize the device and board peripherals */
-    result = cybsp_init();
-    CY_ASSERT(result == CY_RSLT_SUCCESS);
 
     /* Initialize the PLL */
     cyhal_clock_reserve(&pll_clock, &CYHAL_CLOCK_PLL[1]);
@@ -91,11 +102,17 @@ void board_init(void)
     cyhal_clock_free(&fll_clock);
     */
 
-    __enable_irq();
+    /* Enable global interrupts */
+        __enable_irq();
 
-    /* Initialize retarget-io to use the debug UART port */
-    result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX, CY_RETARGET_IO_BAUDRATE);
-    CY_ASSERT(result == CY_RSLT_SUCCESS);
+        /* Initialize retarget-io to use the debug UART port */
+        result = cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX, CY_RETARGET_IO_BAUDRATE);
+
+        /* retarget-io init failed. Stop program execution */
+        if (result != CY_RSLT_SUCCESS)
+        {
+            CY_ASSERT(0);
+        }
 
     setvbuf(stdin, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -115,15 +132,19 @@ int main(void)
     ei_printf(UART_CLEAR_SCREEN);
 
     eidev =  static_cast<EiDevicePSoC62*>(EiDeviceInfo::get_device());
+    eidev->set_sample_length_ms(1600, true);
     at = ei_at_init(eidev);
     ei_printf("Type AT+HELP to see a list of commands.\r\n");
     at->print_prompt();
     eidev->set_state(eiStateFinished);
 
+//    /* Initialize EINK Display Shield */
+//    eink_init();
+
     while(1)
     {
         if(cyhal_uart_getc(&cy_retarget_io_uart_obj, (uint8_t*)&uart_data, 5) == CY_RSLT_SUCCESS) {
-            /* Controlling inference */
+           /* Controlling inference */
             if(is_inference_running() && uart_data == 'b') {
                 ei_stop_impulse();
                 at->print_prompt();
